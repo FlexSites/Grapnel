@@ -1,0 +1,25 @@
+{
+  "name": "graphql.render",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "aws-sdk": "^2.7.25",
+    "axios": "^0.15.3",
+    "bluebird": "^3.4.7",
+    "ejs": "^2.5.5",
+    "hogan.js": "^3.0.2",
+    "lodash.template": "^4.4.0",
+    "pug": "^2.0.0-beta6",
+    "serverless": "^1.5.1"
+  },
+  "devDependencies": {
+    "eslint": "^3.13.1",
+    "eslint-config-vstg": "^1.1.3"
+  }
+}
