@@ -3,12 +3,45 @@
 const AWS = require('aws-sdk');
 const Bluebird = require('bluebird');
 const dynamo = new AWS.DynamoDB.DocumentClient({ region: 'us-west-2' });
+const get = require('lodash.get');
+const axios = require('axios');
+const etag = require('etag');
 
 // Renderers
 const pug = require('pug');
 const hogan = require('hogan.js');
 const ejs = require('ejs');
 const lodash = require('lodash.template');
+
+function getTemplate(requestPath, domain) {
+  const data = require('./schema.json')[domain];
+  requestPath = !!requestPath ? requestPath : '/';
+
+  const request = data.paths[requestPath];
+
+  request.data = Object.keys(request.data).reduce((prev, curr) => {
+    const key = request.data[curr];
+
+    // console.log(data.resources, key);
+    const val = get(data.resources, key, {});
+
+    prev[curr] = val;
+
+    return prev;
+  }, {});
+
+  // console.log(request);
+
+
+  return Bluebird.resolve(request);
+}
+
+// POST /trigger
+
+// [
+//   { "event": "1234" },
+//   { "event": "5678" }
+// ]
 
 const renderers = {
   pug: (page, data) => {
@@ -26,8 +59,11 @@ const renderers = {
 };
 
 module.exports.handler = (event, context, cb) => {
-  getTemplate(event.pathParameters, event.headers.Host)
+  getTemplate(event.pathParameters.proxy, event.headers.Host)
     .then((template) => {
+
+      // console.log('template', template);
+
       const render = renderers[template.page.type];
 
       const dataSources = Object.keys(template.data).map((key) => {
@@ -38,16 +74,47 @@ module.exports.handler = (event, context, cb) => {
         return request;
       });
 
+      template.page.key = 'page';
+
       return Bluebird.props({
-        page: fetchPage(template.page),
+        page: fetch(template.page),
         data: fetchAllData(dataSources),
       })
       .then((results) => {
-        return render(results.page, results.data);
-      });
+
+        console.log('WHAT', results.page);
+
+
+        const etag = combineEtag(Object.assign({ __page: results.page.data }, results.data ));
+        console.log('ETAG', etag);
+
+        console.time('render');
+        const html = render(results.page.data, results.data);
+
+        console.timeEnd('render');
+        return html;
+      })
+      .then((html) => {
+        // console.log('HTML-----------------');
+        // console.log(html);
+        cb(null, html);
+      })
     })
     .catch(cb);
 };
+
+function combineEtag(resources) {
+  console.log('RESOURCES', Object.keys(resources));
+  return Object.keys(resources).map((key) => {
+    const resource = resources[key];
+    console.log(key, resource);
+    const tag = resource.etag;
+
+    console.log('etag', key, tag);
+
+    return tag;
+  }).join('|')
+}
 
 class Render {
   constructor(uri, domain) {
@@ -90,11 +157,15 @@ function fetchAllData(requests) {
 
   return Bluebird.all(
     requests
-      .map(fetchData)
-      .map((result) => {
-        const succeeded = result.isFufilled();
+      .map(fetch)
+  )
+    .then((results) => {
+      return results.map((result) => {
+        const succeeded = result.isFulfilled();
+
 
         if (succeeded) {
+          // console.log('succeeded', result.value())
           return {
             key: result.key,
             data: result.value(),
@@ -103,6 +174,8 @@ function fetchAllData(requests) {
 
         const error = result.reason();
 
+        // console.log('error', error);
+
         errors.push(error);
 
         return {
@@ -110,8 +183,8 @@ function fetchAllData(requests) {
           data: null,
           error,
         };
-      })
-  )
+      });
+    })
     .then((results) => {
       const data = results.reduce((prev, curr) => {
         prev[curr.key] = curr.data;
@@ -122,22 +195,35 @@ function fetchAllData(requests) {
       data.__errors = errors;
 
       return data;
-    });
+    })
+    .catch(ex => {
+      console.error('errro', ex);
+    })
 }
 
-function fetchData(request) {
-  return Bluebird.props({
-    key: request.key,
-    data: Bluebird.resolve(axios.request(request)).reflect(),
-  });
+function fetch(request) {
+  console.time(request.key);
+
+  return Bluebird.resolve(
+    axios.request(request)
+  )
+    .then((results) => {
+      console.timeEnd(request.key);
+
+      return {
+        key: request.key,
+        data: results.data,
+        etag: etag(typeof results.data !== 'string' ? JSON.stringify(results.data) : results.data),
+      };
+    })
+    .reflect();
 }
 
-function fetchPage(request) {
-  return Bluebird.props({
-    key: request.key,
-    data: Bluebird.resolve(axios.request(request)).reflect(),
-  });
-}
+console.time('total');
+module.exports.handler(require('./event.json'), {}, (err, data) => {
+  console.log(err, data);
+  console.timeEnd('total');
+})
 
 
 const item = {
@@ -149,7 +235,7 @@ const item = {
       method: 'POST',
       body: {
         query: '{ event { id } }',
-        variables: { id },
+        variables: { id: '1234' },
       },
       querystring: { cache: false },
       headers: {

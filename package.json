@@ -13,7 +13,9 @@
     "axios": "^0.15.3",
     "bluebird": "^3.4.7",
     "ejs": "^2.5.5",
+    "etag": "^1.7.0",
     "hogan.js": "^3.0.2",
+    "lodash.get": "^4.4.2",
     "lodash.template": "^4.4.0",
     "pug": "^2.0.0-beta6",
     "serverless": "^1.5.1"

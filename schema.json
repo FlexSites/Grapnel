@@ -1,0 +1,25 @@
+{
+  "www.wiseguyscomedy.com": {
+    "resources": {
+      "event": {
+        "list": {
+          "url": "http://www.wiseguyscomedy.com/api",
+          "method": "GET"
+        }
+      }
+    },
+    "paths": {
+      "/": {
+        "data": {
+          "events": "event.list"
+        },
+        "page": {
+          "type": "pug",
+          "url": "http://localhost:8080/wiseguyscomedy.pug",
+          "method": "GET"
+        },
+        "cache": 10000
+      }
+    }
+  }
+}
