@@ -1,5 +1,5 @@
 {
-  "www.wiseguyscomedy.com": {
+  "www%2Ewiseguyscomedy%2Ecom": {
     "resources": {
       "event": {
         "list": {
@@ -9,7 +9,7 @@
       }
     },
     "paths": {
-      "/": {
+      "%2F": {
         "data": {
           "events": "event.list"
         },

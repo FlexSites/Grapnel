@@ -12,7 +12,7 @@ const pug = require('pug');
 const hogan = require('hogan.js');
 const ejs = require('ejs');
 const lodash = require('lodash.template');
-const firebase = require('./firebase');
+const firebase = require('../lib/firebase');
 
 function getFirebaseData(key) {
   const timeKey = `firebase: ${ key }`;
@@ -77,8 +77,8 @@ const renderers = {
   },
 };
 
-module.exports.handler = (event, context, cb) => {
-  getTemplate(event.headers.Host, event.pathParameters.proxy)
+module.exports = (domain, url) => {
+  return getTemplate(domain, url)
     .then((template) => {
 
       // console.log('template', template);
@@ -104,72 +104,32 @@ module.exports.handler = (event, context, cb) => {
         // console.log('WHAT', results.page);
 
 
-        const etag = combineEtag(Object.assign({ __page: results.page.data }, results.data ));
-        console.log('ETAG', etag);
+        // const etag = combineEtag(Object.assign({ __page: results.page.data }, results.data ));
+        // console.log('ETAG', etag);
 
         console.time('render');
         const html = render(results.page.data, results.data);
 
         console.timeEnd('render');
         return html;
-      })
-      .then((html) => {
-        // console.log('HTML-----------------');
-        // console.log(html);
-        cb(null, html);
-      })
-    })
-    .catch(cb);
+      });
+    });
 };
 
-function combineEtag(resources) {
-  console.log('RESOURCES', Object.keys(resources));
-  return Object.keys(resources).map((key) => {
-    const resource = resources[key];
-    console.log(key, resource);
-    const tag = resource.etag;
+// function combineEtag(resources) {
+//   console.log('RESOURCES', Object.keys(resources));
+//   return Object.keys(resources).map((key) => {
+//     const resource = resources[key];
+//     console.log(key, resource);
+//     const tag = resource.etag;
 
-    console.log('etag', key, tag);
+//     console.log('etag', key, tag);
 
-    return tag;
-  }).join('|')
-}
+//     return tag;
+//   }).join('|')
+// }
 
-class Render {
-  constructor(uri, domain) {
-    this.uri = uri;
-    this.domain = domain;
-    this.errors = [];
 
-    this.meta = this.loadMeta(uri, domain);
-    this.data = this.loadData(this.meta);
-    this.page = this.loadPage(this.meta);
-  }
-
-  loadMeta() {
-    return dynamo.get({
-      TableName: 'Table',
-      Key: {
-        path: this.uri,
-        domain: this.domain,
-      },
-    })
-      .promise()
-      .then((item) => {
-        return item;
-      })
-      .catch((ex) => {
-        cb(ex);
-      });
-  }
-
-  loadData(metaPromise) {
-    return metaPromise
-      .then((meta) => {
-
-      })
-  }
-}
 
 function fetchAllData(requests) {
   const errors = [];
@@ -179,39 +139,11 @@ function fetchAllData(requests) {
       .map(fetch)
   )
     .then((results) => {
-      return results.map((result) => {
-        const succeeded = result.isFulfilled();
-
-
-        if (succeeded) {
-          // console.log('succeeded', result.value())
-          return {
-            key: result.key,
-            data: result.value(),
-          };
-        }
-
-        const error = result.reason();
-
-        // console.log('error', error);
-
-        errors.push(error);
-
-        return {
-          key: result.key,
-          data: null,
-          error,
-        };
-      });
-    })
-    .then((results) => {
       const data = results.reduce((prev, curr) => {
         prev[curr.key] = curr.data;
 
         return prev;
       }, {});
-
-      data.__errors = errors;
 
       return data;
     })
@@ -234,15 +166,14 @@ function fetch(request) {
         data: results.data,
         etag: etag(typeof results.data !== 'string' ? JSON.stringify(results.data) : results.data),
       };
-    })
-    .reflect();
+    });
 }
 
-console.time('total');
-module.exports.handler(require('./event.json'), {}, (err, data) => {
-  console.log(err, data);
-  console.timeEnd('total');
-})
+// console.time('total');
+// module.exports.handler(require('./event.json'), {}, (err, data) => {
+//   console.log(err, data);
+//   console.timeEnd('total');
+// })
 
 
 // const item = {
